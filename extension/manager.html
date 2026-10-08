@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ListDL manager</title>
+  <link rel="stylesheet" href="manager.css">
+</head>
+<body>
+  <header>
+    <h1 id="title">ListDL</h1>
+    <p id="source"></p>
+    <p id="summary"></p>
+  </header>
+
+  <section class="controls">
+    <button id="start">Start downloading</button>
+    <button id="pause" disabled>Pause</button>
+    <button id="retry">Retry failed</button>
+    <button id="export">Export report (CSV)</button>
+    <button id="clear">Clear list</button>
+    <label>Wait between documents
+      <input id="delay" type="number" min="2" max="120" value="6"> s
+    </label>
+    <label><input id="redownload" type="checkbox"> Re-download items already saved</label>
+  </section>
+
+  <p id="status" role="status"></p>
+  <p class="note">Keep this tab open while it runs. Files are saved to
+    <code>Downloads/ListDL/&lt;list name&gt;/</code>. Only documents that Scribd offers a
+    Download button for are downloaded; the rest are marked “no download”.</p>
+
+  <table>
+    <thead><tr><th>#</th><th>Title</th><th>Status</th><th>Details</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <details id="skipped-wrap" hidden>
+    <summary>Not documents (books, audiobooks, etc. — skipped)</summary>
+    <ul id="skipped"></ul>
+  </details>
+
+  <script src="manager.js" type="module"></script>
+</body>
+</html>

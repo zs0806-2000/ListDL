@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "ListDL for Scribd",
+  "version": "0.1.0",
+  "description": "Downloads every document in a Scribd list using Scribd's own Download button, one at a time.",
+  "action": {
+    "default_title": "ListDL",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["downloads", "scripting", "storage", "tabs"],
+  "host_permissions": ["https://*.scribd.com/*"]
+}

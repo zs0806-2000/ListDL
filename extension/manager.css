@@ -1,0 +1,16 @@
+:root { color-scheme: light dark; --muted: #666; --ok: #1a7f37; --bad: #b42318; --warn: #9a6700; }
+@media (prefers-color-scheme: dark) { :root { --muted: #aaa; --ok: #4ac26b; --bad: #ff7b72; --warn: #d29922; } }
+body { font: 14px system-ui, sans-serif; margin: 16px; max-width: 1100px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+header p, .note { color: var(--muted); margin: 2px 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+button { padding: 6px 12px; font: inherit; cursor: pointer; }
+input[type=number] { width: 4em; }
+#status { font-weight: 600; min-height: 1.2em; }
+table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #8884; vertical-align: top; }
+td:first-child { color: var(--muted); }
+.s-done { color: var(--ok); }
+.s-failed { color: var(--bad); }
+.s-no-download { color: var(--warn); }
+.s-working, .s-saving { font-weight: 600; }
