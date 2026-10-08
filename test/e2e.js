@@ -28,7 +28,7 @@ function prepareExtension() {
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', `${tls}/key.pem`,
     '-out', `${tls}/cert.pem`, '-days', '2', '-subj', '/CN=www.scribd.com'], { stdio: 'ignore' });
   const server = spawn(process.execPath, [path.join(__dirname, 'mock-server.js')], {
-    env: { ...process.env, PORT, TLS_KEY: `${tls}/key.pem`, TLS_CERT: `${tls}/cert.pem` },
+    env: { ...process.env, PORT, PAGE_DELAY_MS: 2000, TLS_KEY: `${tls}/key.pem`, TLS_CERT: `${tls}/cert.pem` },
   });
   await sleep(500);
   const ext = prepareExtension();
@@ -78,9 +78,12 @@ function prepareExtension() {
     check(job.items[0].title === 'Mock Document 1001', `kept the descriptive title "${job.items[0].title}"`);
     check(job.skippedNonDocuments.length === 1, 'book link reported as skipped');
 
-    await mgr.fill('#delay', '2');
+    await mgr.fill('#delay', '0');
+    await mgr.fill('#parallel', process.env.PARALLEL || '3');
+    const started = Date.now();
     await mgr.click('#start');
     await mgr.waitForFunction(() => /Finished|Paused/.test(document.getElementById('status').textContent), null, { timeout: 300000 });
+    console.log(`  run took ${((Date.now() - started) / 1000).toFixed(1)} s`);
     await sleep(2000);
     const after = await mgr.evaluate(async () => (await chrome.storage.local.get('job')).job.items);
     const byId = Object.fromEntries(after.map((i) => [i.id, i]));
@@ -92,6 +95,12 @@ function prepareExtension() {
     const saved = fs.readdirSync(path.join(downloadDir, 'ListDL', 'My Test List')).sort();
     console.log('  saved files:', saved);
     check(saved.length === 11 && saved.includes('Mock Document 1001.pdf'), 'files saved as Downloads/ListDL/<list>/<title>.pdf');
+    // With several documents in flight, each file must still carry its own document's name.
+    const mismatched = saved.filter((f) => {
+      const id = f.match(/(\d+)\.pdf$/)[1];
+      return !fs.readFileSync(path.join(downloadDir, 'ListDL', 'My Test List', f), 'utf8').includes(`mock ${id}`);
+    });
+    check(mismatched.length === 0, `every file matches its document (${mismatched.length} mismatched)`);
     const openTabs = await mgr.evaluate(async () => (await chrome.tabs.query({})).filter((t) => /\/document\//.test(t.url)).length);
     check(openTabs === 0, 'document tabs closed afterwards');
   } finally {

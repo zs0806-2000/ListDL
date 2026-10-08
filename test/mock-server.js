@@ -59,7 +59,9 @@ function handler(req, res) {
   if (url.pathname === '/list') {
     res.writeHead(200, { 'content-type': 'text/html' }).end(listPage());
   } else if ((m = url.pathname.match(/^\/document\/(\d+)/))) {
-    res.writeHead(200, { 'content-type': 'text/html' }).end(docPage(m[1]));
+    // Simulate a slow page load so the test exercises parallel loading.
+    const id = m[1];
+    setTimeout(() => res.writeHead(200, { 'content-type': 'text/html' }).end(docPage(id)), Number(process.env.PAGE_DELAY_MS || 0));
   } else if ((m = url.pathname.match(/^\/file\/(\d+)\.(\w+)$/))) {
     res.writeHead(200, {
       'content-type': 'application/pdf',

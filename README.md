@@ -27,15 +27,22 @@ on your account, ListDL marks it **no-download** and moves on.
    until every item has loaded. Large lists can take a minute.
 4. Check the table of found documents. Books, audiobooks and other non-document items
    are listed under *Not documents* and skipped.
-5. Optional: set **Wait between documents** (default 6 seconds). Higher values are gentler on Scribd.
+5. Optional: adjust the speed settings.
+   - **Documents at a time** (default 3, max 5): how many document pages load at once.
+   - **Pause after each document** (default 2 seconds).
+
+   Lower numbers are gentler on Scribd. If you start seeing *failed* items or Scribd
+   asks you to verify you're human, lower **Documents at a time** and raise the pause.
 6. Click **Start downloading**. Keep the manager tab open.
    For each document, ListDL opens the page in a background tab, clicks **Download**,
    picks **PDF** in the dialog if one appears, waits for the file to start, then closes the tab.
+   Pages load in parallel, but the Download clicks happen one at a time. That's how
+   ListDL knows which file belongs to which document.
 7. Files are saved to `Downloads/ListDL/<list name>/<document title>.pdf`.
 
 ### Tips
 
-- **Pause** stops after the current document. **Start downloading** resumes where it stopped.
+- **Pause** stops after the documents already in progress. **Start downloading** resumes where it stopped.
 - **Retry failed** runs the *failed* and *no-download* items again.
 - **Export report (CSV)** saves the status of every item.
 - Documents downloaded in an earlier run are marked *done* and skipped. Tick

@@ -82,9 +82,11 @@ export async function collectListItems({ maxRounds = 300, pauseMs = 1500 } = {})
  * phase "primary": the Download button on the page.
  * phase "secondary": an option inside the dialog that opens after it
  * (a PDF choice, or a confirming Download button).
- * Returns { clicked: boolean, label?: string, reason?: string }.
+ * With dryRun (primary phase only), it waits for the button but doesn't click it.
+ * Returns { clicked: boolean, label?: string, reason?: string }
+ * (with dryRun, clicked means the button was found).
  */
-export async function clickDownload({ phase = 'primary', timeoutMs = 20000 } = {}) {
+export async function clickDownload({ phase = 'primary', timeoutMs = 20000, dryRun = false } = {}) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const labelOf = (el) => (el.getAttribute('aria-label') || el.textContent || '').replace(/\s+/g, ' ').trim();
   const visible = (el) => el.offsetParent !== null || el.getClientRects().length > 0;
@@ -124,7 +126,7 @@ export async function clickDownload({ phase = 'primary', timeoutMs = 20000 } = {
     if (phase === 'primary') {
       const hit = findPrimary();
       if (hit) {
-        hit.el.click();
+        if (!dryRun) hit.el.click();
         return { clicked: true, label: hit.label };
       }
     } else {

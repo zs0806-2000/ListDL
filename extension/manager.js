@@ -8,12 +8,17 @@ const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const PAGE_LOAD_TIMEOUT_MS = 45000;
-const FIRST_CLICK_WAIT_MS = 8000; // how long to wait for a download after the page's Download button
-const DIALOG_WAIT_MS = 30000; // how long to wait after choosing PDF / confirming in the dialog
+const DIRECT_WAIT_MS = 1500; // a Download button that starts the file directly does so quickly
+const DIALOG_FIND_MS = 6000; // how long to look for the PDF / confirm dialog after the first click
+const DIALOG_WAIT_MS = 30000; // how long to wait for the file after choosing PDF / confirming
 
 let job = null; // { listTitle, pageUrl, items: [...], skippedNonDocuments: [...] }
 let running = false;
-let current = null; // { item, resolve } while a document is being processed
+// Several documents load in parallel, but only one at a time may be between
+// "click Download" and "download started": that is how each new download is
+// matched to its document. `current` is the document holding that slot.
+let current = null; // { item, downloadId, resolve }
+let clickLock = Promise.resolve();
 const downloadToItem = new Map(); // downloadId -> item id
 
 // ---------- storage ----------
@@ -97,6 +102,8 @@ function setRunning(value) {
   $('start').disabled = value;
   $('retry').disabled = value;
   $('clear').disabled = value;
+  $('parallel').disabled = value;
+  $('delay').disabled = value;
   $('pause').disabled = !value;
 }
 
@@ -153,9 +160,9 @@ function waitForDownload(timeoutMs) {
   });
 }
 
-// Any download that starts while a document is being processed is treated as
-// that document's file. Documents are processed one at a time, so avoid
-// starting other downloads in this browser while a run is active.
+// Any download that starts while a document holds the click slot is treated
+// as that document's file, so avoid starting other downloads in this browser
+// while a run is active.
 chrome.downloads.onCreated.addListener((dl) => {
   if (!current || current.downloadId || dl.byExtensionId === chrome.runtime.id) return;
   current.downloadId = dl.id;
@@ -206,49 +213,64 @@ chrome.downloads.onChanged.addListener(async (delta) => {
 
 // ---------- queue ----------
 
+// Runs fn while holding the click slot (see `current` above).
+function withClickSlot(fn) {
+  const result = clickLock.then(fn);
+  clickLock = result.catch(() => {});
+  return result;
+}
+
 async function processItem(item) {
   item.status = 'working';
   item.detail = 'opening page';
   render();
 
   const tab = await chrome.tabs.create({ url: item.url, active: false });
-  current = { item, downloadId: null, resolve: null };
   try {
+    // Slow part, done in parallel: load the page and wait for its Download button.
     await waitForTabComplete(tab.id, PAGE_LOAD_TIMEOUT_MS);
-    await sleep(1500); // let the page's scripts render the toolbar
-
-    const first = await runInTab(tab.id, clickDownload, { phase: 'primary', timeoutMs: 20000 });
-    if (!first?.clicked) {
+    const found = await runInTab(tab.id, clickDownload, { phase: 'primary', timeoutMs: 20000, dryRun: true });
+    if (!found?.clicked) {
       item.status = 'no-download';
-      item.detail = first?.reason || 'no Download button found';
+      item.detail = found?.reason || 'no Download button found';
       return;
     }
+    item.detail = 'waiting for its turn to click';
+    render();
 
-    let downloadId = await waitForDownload(FIRST_CLICK_WAIT_MS);
-    let clicked = [first.label];
-    if (!downloadId) {
-      const second = await runInTab(tab.id, clickDownload, { phase: 'secondary', timeoutMs: 8000 });
-      if (second?.clicked) {
-        clicked.push(second.label);
-        downloadId = await waitForDownload(DIALOG_WAIT_MS);
-      }
-    }
+    // Short part, one document at a time: click and wait for the file to start.
+    await withClickSlot(async () => {
+      current = { item, downloadId: null, resolve: null };
+      try {
+        const first = await runInTab(tab.id, clickDownload, { phase: 'primary', timeoutMs: 5000 });
+        if (!first?.clicked) throw new Error(first?.reason || 'Download button disappeared');
+        const clicked = [first.label];
 
-    if (downloadId) {
-      // onChanged moves it to "done" (or "failed") when the file finishes.
-      if (item.status === 'working') {
-        item.status = 'saving';
-        item.detail = `clicked: ${clicked.join(' → ')}`;
+        let downloadId = await waitForDownload(DIRECT_WAIT_MS);
+        if (!downloadId) {
+          const second = await runInTab(tab.id, clickDownload, { phase: 'secondary', timeoutMs: DIALOG_FIND_MS });
+          if (second?.clicked) clicked.push(second.label);
+          downloadId = await waitForDownload(second?.clicked ? DIALOG_WAIT_MS : 0);
+        }
+
+        if (downloadId) {
+          // onChanged moves it to "done" (or "failed") when the file finishes.
+          if (item.status === 'working') {
+            item.status = 'saving';
+            item.detail = `clicked: ${clicked.join(' → ')}`;
+          }
+        } else {
+          item.status = 'failed';
+          item.detail = `clicked “${clicked.join(' → ')}” but no download started`;
+        }
+      } finally {
+        current = null;
       }
-    } else {
-      item.status = 'failed';
-      item.detail = `clicked “${clicked.join(' → ')}” but no download started`;
-    }
+    });
   } catch (err) {
     item.status = 'failed';
     item.detail = err?.message || String(err);
   } finally {
-    current = null;
     // Closing the tab does not cancel a download that has already started.
     await chrome.tabs.remove(tab.id).catch(() => {});
     await saveJob();
@@ -260,13 +282,27 @@ async function run(statuses) {
   if (!job || running) return;
   setRunning(true);
   try {
-    const delayMs = Math.max(2, Number($('delay').value) || 6) * 1000;
+    const delayMs = Math.max(0, Number($('delay').value) || 0) * 1000;
+    const parallel = Math.min(5, Math.max(1, Number($('parallel').value) || 3));
     const todo = job.items.filter((i) => statuses.includes(i.status));
-    for (let n = 0; n < todo.length && running; n++) {
-      setStatus(`Working on ${n + 1} of ${todo.length}: ${todo[n].title || todo[n].id}`);
-      await processItem(todo[n]);
-      if (running && n < todo.length - 1) await sleep(delayMs);
+    let next = 0;
+    let finished = 0;
+    const progress = () =>
+      setStatus(`Processed ${finished} of ${todo.length} (${parallel} at a time)…`);
+    progress();
+
+    // Each worker takes the next document from the shared queue until it is empty.
+    async function worker(n) {
+      // Stagger start-up so the first pages don't all load at the same instant.
+      await sleep(n * 1000);
+      while (running && next < todo.length) {
+        await processItem(todo[next++]);
+        finished++;
+        progress();
+        if (running && next < todo.length && delayMs) await sleep(delayMs);
+      }
     }
+    await Promise.all(Array.from({ length: Math.min(parallel, todo.length) }, (_, n) => worker(n)));
     setStatus(running ? 'Finished. Files still saving will update below.' : 'Paused.');
   } finally {
     setRunning(false);
@@ -329,7 +365,7 @@ $('retry').addEventListener('click', () => run(['failed', 'no-download']));
 $('pause').addEventListener('click', () => {
   running = false;
   $('pause').disabled = true;
-  setStatus('Pausing after the current document…');
+  setStatus('Pausing after the documents in progress…');
 });
 $('export').addEventListener('click', exportCsv);
 $('clear').addEventListener('click', async () => {
