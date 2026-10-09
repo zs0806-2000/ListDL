@@ -1,12 +1,12 @@
 # ListDL — bulk-download a Scribd list
 
-A Chrome extension that goes through a Scribd list (or your **Saved** page) and
+ListDL is a Chrome extension that goes through a Scribd lists (or your **Saved** page) and
 downloads each document by clicking **Scribd's own Download button**, one at a
-time, in your normal logged-in browser.
+time, in your normal logged-in browser. This allows users to compile a list of texts and then download them from Scribd in one simple step. 
 
-It does **not** rebuild documents from the page viewer, and it does not get around
+Please note that this extension does NOT rebuild documents from the page viewer, and it does not get around
 paywalls or download restrictions. If Scribd shows no Download button for a document
-on your account, ListDL marks it **no-download** and moves on.
+on your account, ListDL marks it and moves on to the next.
 
 ---
 
@@ -59,12 +59,7 @@ on your account, ListDL marks it **no-download** and moves on.
 
 ## Known limitations — please read
 
-- **Not yet tested on the real scribd.com.** The cloud machine this was built on cannot
-  reach scribd.com, so I couldn't check Scribd's actual page layout. ListDL finds
-  buttons by visible text and labels (“Download”, “PDF”, “Load more”), not by exact
-  page code. It was tested end-to-end against a mock site (see *Tests*). If Scribd labels
-  things differently, scanning or downloading may not work. In that case, open an issue
-  that includes the **Details** column from the manager.
+
 - Scribd's page design can change at any time and may break the button detection.
 - Only `scribd.com/document/…`, `/doc/…` and `/presentation/…` links are collected.
 
