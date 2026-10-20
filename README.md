@@ -95,7 +95,7 @@ Permissions it uses:
 
 ## Tests
 
-`test/mock-server.js` is a fake Scribd-like site. It has a list with “Load more”, a
+Tests were conducted to determine functionality. With Scribd being paywalled, a mock site was used. `test/mock-server.js` is a fake Scribd-like site. It has a list with “Load more”, a
 document with a direct Download link, documents with a *Download → PDF → Download*
 dialog, a document without a download option, and a book link. `test/e2e.js` loads the
 extension into headless Chromium and checks scanning, downloading, skipping, file naming
